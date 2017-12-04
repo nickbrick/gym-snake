@@ -9,10 +9,14 @@ class SnakeEnv(gym.Env):
                 'video.frames_per_second': 50}
     step_directions = np.array([[1, 0], [0, -1], [-1, 0], [0, 1]])
     def __init__(self):
-        self.viewer = None
-        self.state = None
         self.FIELD_WIDTH = 20
         self.FIELD_HEIGHT = 11
+        self.action_space = spaces.Discrete(4)
+        lows = -np.ones(self.FIELD_WIDTH * self.FIELD_HEIGHT)
+        highs = np.ones(self.FIELD_WIDTH * self.FIELD_HEIGHT)
+        self.observation_space = spaces.Box(lows, highs)
+        self.viewer = None
+        self.state = None
         self.field = np.zeros((self.FIELD_HEIGHT, self.FIELD_WIDTH))
         self.field[10, 0:9] = np.array(range(1,10))
         self.addFood()
@@ -80,14 +84,15 @@ class SnakeEnv(gym.Env):
         if self.viewer is None:
             self.viewer = rendering.Viewer(screen_width, screen_height)
 
+        
         back = rendering.FilledPolygon([(0,0), (0,screen_height),(screen_width,screen_height),(screen_width,0)])
         back.set_color(1,1,1)
         self.viewer.add_geom(back)
 
-
+    
         food_idx = np.argwhere(self.field==-1)[0]
-        l, r, t, b = food_idx[1] * CELL_SIZE, (food_idx[1] + 1) * CELL_SIZE, (11 - food_idx[0]) * CELL_SIZE, (11 - food_idx[0] - 1) * CELL_SIZE
-        
+        l, r, t, b = food_idx[1] * CELL_SIZE, (food_idx[1] + 1) * CELL_SIZE, (self.FIELD_HEIGHT - food_idx[0]) * CELL_SIZE, (self.FIELD_HEIGHT - food_idx[0] - 1) * CELL_SIZE
+        l, r, t, b = l + PAD, r - PAD, t - PAD, b + PAD
         food = rendering.FilledPolygon([(l,b), (l,t), (r,t), (r,b)])
         food.set_color(0, 1, 0)
         self.viewer.add_geom(food)
@@ -96,21 +101,28 @@ class SnakeEnv(gym.Env):
         snake_lifes = [self.field[tuple(idx)] for idx in snake_idxs]
         snake_idxs = [(idx, self.field[tuple(idx)]) for idx in snake_idxs]
         snake_idxs.sort(key=lambda x: x[1])
-        spaghetti = False
-        for idx in snake_idxs:
+        idx0 = snake_idxs[0][0]
+        l0, r0, t0, b0 = idx0[1] * CELL_SIZE, (idx0[1] + 1) * CELL_SIZE, (self.FIELD_HEIGHT - idx0[0]) * CELL_SIZE, (self.FIELD_HEIGHT - idx0[0] - 1) * CELL_SIZE
+        l0, r0, t0, b0 = l0 + PAD, r0 - PAD, t0 - PAD, b0 + PAD
+        for idx in snake_idxs[1:]:
             idx = idx[0]
-            l, r, t, b = idx[1] * CELL_SIZE, (idx[1] + 1) * CELL_SIZE, (11 - idx[0]) * CELL_SIZE, (11 - idx[0] - 1) * CELL_SIZE
+            l, r, t, b = idx[1] * CELL_SIZE, (idx[1] + 1) * CELL_SIZE, (self.FIELD_HEIGHT - idx[0]) * CELL_SIZE, (self.FIELD_HEIGHT - idx[0] - 1) * CELL_SIZE
             l, r, t, b = l + PAD, r - PAD, t - PAD, b + PAD
-            cell = rendering.FilledPolygon([(l,b), (l,t), (r,t), (r,b)])
-            cell.set_color(.5, .5, .5)
+            step = idx-idx0
+            if np.array_equal(step, SnakeEnv.step_directions[0]):
+                cell = rendering.FilledPolygon([(l0,t0), (r0,t0), (r0,b), (l,b)])
+            elif np.array_equal(step, SnakeEnv.step_directions[1]):
+                cell = rendering.FilledPolygon([(l,t0), (r0,t0), (r0,b0), (l,b0)])
+            elif np.array_equal(step, SnakeEnv.step_directions[2]):
+                cell = rendering.FilledPolygon([(l,t), (r,t), (r,b0), (l,b0)])
+            elif np.array_equal(step, SnakeEnv.step_directions[3]):
+                cell = rendering.FilledPolygon([(l0,t0), (r,t), (r,b), (l0,b0)])
+            else:
+                print('oops')
+            cell.set_color(0.5, 0.5, 0.5)
             self.viewer.add_geom(cell)
-            if spaghetti:
-                l_, r_, t_, b_ = (l+l0)/2, (r+r0)/2, (t+t0)/2, (b+b0)/2
-                cell = rendering.FilledPolygon([(l_,b_), (l_,t_), (r_,t_), (r_,b_)])
-                cell.set_color(.5, .5, .5)
-                self.viewer.add_geom(cell)
+            idx0 = idx
             l0, r0, t0, b0 = l, r, t, b
-            spaghetti = True
 
         # for i in range(11):
         #     print(self.field[i,:])
@@ -122,29 +134,32 @@ if __name__ == '__main__':
     env = gym.make('Snake-v0')
     env.reset()
     # action_chain = [2,3,2,3,2,1,1,1,1,0,1,2,2,3,3,3,3,2,3,2,3,2,3,2,3,0]
-    action_chain = [1,2,1,0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,3,2,3,2,1,1,1,1,0,1,2,2,3,3,3,3,2,3,2,3,2,3,2,3,0]
+    action_chain = [3,2,3,2,3]
     # for action in action_chain:
     done = False
-
+    i = 0
     while not done:
         env.render()
-        import msvcrt
-
-        key = ord(msvcrt.getch())
-        if key == 224: #Special keys (arrows, f keys, ins, del, etc.)
+        if True:
+            import msvcrt
             key = ord(msvcrt.getch())
-            print('after')
-            if key == 80: #Down arrow
-                action = 0
-            elif key == 72: #Up arrow
-                action = 2
-            elif key == 75: #left arrow
-                action = 1
-            elif key == 77: #right arrow
-                action = 3
+            if key == 224: #Special keys (arrows, f keys, ins, del, etc.)
+                key = ord(msvcrt.getch())
+                print('after')
+                if key == 80: #Down arrow
+                    action = 0
+                elif key == 72: #Up arrow
+                    action = 2
+                elif key == 75: #left arrow
+                    action = 1
+                elif key == 77: #right arrow
+                    action = 3
+            else:
+                pass
         else:
-            pass
-
+            action = action_chain[i]
+            i += 1
+            time.sleep(0.4)
         state, reward, done, info = env.step(action)
         if done:
             state = env.reset()
