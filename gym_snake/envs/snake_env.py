@@ -145,7 +145,6 @@ if __name__ == '__main__':
             key = ord(msvcrt.getch())
             if key == 224: #Special keys (arrows, f keys, ins, del, etc.)
                 key = ord(msvcrt.getch())
-                print('after')
                 if key == 80: #Down arrow
                     action = 0
                 elif key == 72: #Up arrow
