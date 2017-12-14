@@ -16,6 +16,10 @@ class SnakeEnv(gym.Env):
         highs = np.ones(self.FIELD_WIDTH * self.FIELD_HEIGHT)
         self.observation_space = spaces.Box(lows, highs)
         self.viewer = None
+        self.head_new = None
+        self.food_new = None
+        self.body_new = None
+        self.empty_spaces_new = None
         self.state = None
         self.field = np.zeros((self.FIELD_HEIGHT, self.FIELD_WIDTH))
         self.field[10, 0:9] = np.array(range(1,10))
@@ -36,6 +40,21 @@ class SnakeEnv(gym.Env):
             pass
 
         
+    def _step(self, action):
+        # 0 1 2 3 = Down Left Up Right
+        direction = SnakeEnv.step_directions[action]
+        added = np.add(self.head_new, direction)
+        self.head_new = tuple(added)
+        if -1 in self.head_new or self.head_new[0] == self.FIELD_HEIGHT or self.head_new[1] == self.FIELD_WIDTH:  # hit a wall
+            reward = -1
+            done = True
+        elif self.head_new in self.body_new:  # hit body
+            if self.head_new == self.body_new[0]:  # try to hit neck, illegal move
+                reward = 0
+                done = False
+            else:
+                reward = -1
+                done = True
     def _step(self, action):
         # 0 1 2 3 = Down Left Up Right
         head = self.head_pos()
@@ -64,6 +83,8 @@ class SnakeEnv(gym.Env):
         return self.field, reward, done, {}
 
     def _reset(self):
+        self.head_new = (10,8)
+        self.body_new =np.array([[10,x] for x in range(8,-1,-1)])
         self.field = np.zeros((self.FIELD_HEIGHT, self.FIELD_WIDTH))
         self.field[10, 0:9] = np.array(range(1,10))
         self.addFood()
